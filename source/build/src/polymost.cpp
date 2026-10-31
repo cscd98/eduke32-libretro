@@ -3244,7 +3244,20 @@ void polymost_bufferVert(vec3f_t const v, vec2f_t const t)
 void polymost_finishBufferedDrawing(int mode)
 {
     if (!persistentStreamBuffer)
-        glBufferSubData(GL_ARRAY_BUFFER, drawpolyVertsOffset * sizeof(float) * 5, drawpolyVertsCnt * sizeof(float) * 5, drawpolyVerts);
+    {
+        GLintptr   const off   = drawpolyVertsOffset * sizeof(float) * 5;
+        GLsizeiptr const bytes = drawpolyVertsCnt * sizeof(float) * 5;
+#ifdef EDUKE32_GLES
+        void *dst = glMapBufferRange(GL_ARRAY_BUFFER, off, bytes, GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+        if (dst)
+        {
+            Bmemcpy(dst, drawpolyVerts, bytes);
+            glUnmapBuffer(GL_ARRAY_BUFFER);
+        }
+        else
+#endif
+            glBufferSubData(GL_ARRAY_BUFFER, off, bytes, drawpolyVerts);
+    }
 
     glDrawArrays(mode, drawpolyVertsOffset, drawpolyVertsCnt);
     drawpolyVertsOffset += drawpolyVertsCnt;

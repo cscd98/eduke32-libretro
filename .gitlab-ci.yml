@@ -93,40 +93,40 @@ libretro-build-osx-arm64:
 
 ################################### CELLULAR #################################
 # Android ARMv8a
-#android-arm64-v8a:
-#  extends:
-#    - .libretro-android-make-arm64-v8a
-#    - .core-defs
-#  variables:
-#    API_LEVEL: 24
+android-arm64-v8a:
+  extends:
+    - .libretro-android-make-arm64-v8a
+    - .core-defs
+  variables:
+    API_LEVEL: 24
 
 # iOS arm64
-#libretro-build-ios-arm64:
-#  extends:
-#    - .libretro-ios-arm64-make-default
-#    - .core-defs
-#  variables:
-#    CMAKE_ADDL_COMP_FLAGS: ""
-#    IOS_MINVER: 14.0
+libretro-build-ios-arm64:
+  extends:
+    - .libretro-ios-arm64-make-default
+    - .core-defs
+  variables:
+    CMAKE_ADDL_COMP_FLAGS: ""
+    IOS_MINVER: 14.0
 
 # tvOS arm64
-#libretro-build-tvos-arm64:
-#  extends:
-#    - .libretro-tvos-arm64-make-default
-#    - .core-defs
-#  variables:
-#    CMAKE_ADDL_COMP_FLAGS: ""
-#    MINVER: 14.0
+libretro-build-tvos-arm64:
+  extends:
+    - .libretro-tvos-arm64-make-default
+    - .core-defs
+  variables:
+    CMAKE_ADDL_COMP_FLAGS: ""
+    MINVER: 14.0
 
 ################################## MISC ####################################
 # webOS armv7a
-#libretro-build-webos-armv7a:
-#  extends:
-#    - .libretro-webos-armv7a-make-default
-#    - .core-defs
+libretro-build-webos-armv7a:
+  extends:
+    - .libretro-webos-armv7a-make-default
+    - .core-defs
 
 # webOS aarch64
-#libretro-build-webos-aarch64:
-#  extends:
-#    - .libretro-webos-aarch64-make-default
-#    - .core-defs
+libretro-build-webos-aarch64:
+  extends:
+    - .libretro-webos-aarch64-make-default
+    - .core-defs
