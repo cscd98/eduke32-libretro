@@ -14,4 +14,4 @@ jobs:
     - name: Build core
       run: |
         cd platform/Libretro
-        make -f Makefile.libretro platform=ios
+        make -f Makefile.libretro platform=ios-arm64

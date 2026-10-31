@@ -72,15 +72,14 @@ else ifeq ($(platform), osx)
   CXXFLAGS += -fPIC
   LDFLAGS  += -dynamiclib
 
-else ifeq ($(platform), ios)
-  TARGET_NAME := $(TARGET_NAME)_ios
+else ifeq ($(platform), ios-arm64)
   EXT      := dylib
   CFLAGS   += -fPIC
   CXXFLAGS += -fPIC
   LDFLAGS  += -dynamiclib
   ifeq ($(IOSSDK),)
     IOSSDK := $(shell xcodebuild -version -sdk iphoneos Path)
-	endif
+  endif
   CC       := clang -arch arm64 -isysroot $(IOSSDK)
   CXX      := clang++ -arch arm64 -isysroot $(IOSSDK)
 
