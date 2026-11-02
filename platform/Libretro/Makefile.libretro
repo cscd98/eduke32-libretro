@@ -83,6 +83,28 @@ else ifeq ($(platform), ios-arm64)
   CC       := clang -arch arm64 -isysroot $(IOSSDK)
   CXX      := clang++ -arch arm64 -isysroot $(IOSSDK)
 
+# Dingux - RETROFW
+#else ifeq ($(platform), retrofw)
+#  EXT      := so
+#  CC       := /opt/retrofw-toolchain/usr/bin/mipsel-linux-gcc
+#  CXX      := /opt/retrofw-toolchain/usr/bin/mipsel-linux-g++
+#  AR       := /opt/retrofw-toolchain/usr/bin/mipsel-linux-ar
+#  CFLAGS   += -fPIC -ffast-math -march=mips32 -mtune=mips32 -mhard-float -fomit-frame-pointer
+#  CXXFLAGS += -fPIC -ffast-math -march=mips32 -mtune=mips32 -mhard-float -fomit-frame-pointer
+#  LDFLAGS  += -shared -Wl,--no-undefined
+#  USE_OPENGL := 0
+
+# Dingux - Miyoo
+#else ifeq ($(platform), miyoo)
+#  EXT      := so
+#  CC       := /opt/miyoo/usr/bin/arm-linux-gcc
+#  CXX      := /opt/miyoo/usr/bin/arm-linux-g++
+#  AR       := /opt/miyoo/usr/bin/arm-linux-ar
+#  CFLAGS   += -fPIC -fomit-frame-pointer -ffast-math -mcpu=arm926ej-s
+#  CXXFLAGS += -fPIC -fomit-frame-pointer -ffast-math -mcpu=arm926ej-s
+#  LDFLAGS  += -shared -Wl,--no-undefined
+#  USE_OPENGL := 0
+
 else ifeq ($(platform), tvos-arm64)
   TARGET_NAME := $(TARGET_NAME)_tvos
   EXT      := dylib
