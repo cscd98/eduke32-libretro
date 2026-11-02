@@ -20,6 +20,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 //-------------------------------------------------------------------------
 
+#ifdef LIBRETRO
+#include "vr.h"
+#endif
 #include "demo.h"
 #include "duke3d.h"
 #include "enet.h"
@@ -1686,7 +1689,7 @@ static int32_t A_ShootHardcoded(int spriteNum, int projecTile, int shootAng, vec
 }
 #endif
 
-int A_ShootWithZvel(int const spriteNum, int const projecTile, int const forceZvel)
+static int A_ShootWithZvelInternal(int const spriteNum, int const projecTile, int const forceZvel, int const angleOffset)
 {
     Bassert(projecTile >= 0);
 
@@ -1709,7 +1712,7 @@ int A_ShootWithZvel(int const spriteNum, int const projecTile, int const forceZv
     {
         startPos = pPlayer->pos;
         startPos.z += pPlayer->pyoff + ZOFFSET6;
-        shootAng = fix16_to_int(pPlayer->q16ang);
+        shootAng = (fix16_to_int(pPlayer->q16ang) + angleOffset) & 2047;
 
         pPlayer->crack_time = PCRACKTIME;
     }
@@ -1761,6 +1764,29 @@ int A_ShootWithZvel(int const spriteNum, int const projecTile, int const forceZv
 #endif
 }
 
+
+int A_ShootWithZvel(int const spriteNum, int const projecTile, int const forceZvel)
+{
+#ifdef LIBRETRO
+    if (sprite[spriteNum].picnum == APLAYER)
+    {
+        auto const pPlayer = g_player[P_GetP(&sprite[spriteNum])].ps;
+        int32_t    angleOffset, horiz;
+
+        if (libretro_vr_aim(&angleOffset, &horiz))
+        {
+            // Aim with the controller: temporarily replace the player's pitch
+            fix16_t const oldHoriz = pPlayer->q16horiz;
+            pPlayer->q16horiz      = F16(horiz) - pPlayer->q16horizoff;
+            int const result       = A_ShootWithZvelInternal(spriteNum, projecTile, forceZvel, angleOffset);
+            pPlayer->q16horiz      = oldHoriz;
+
+            return result;
+        }
+    }
+#endif
+    return A_ShootWithZvelInternal(spriteNum, projecTile, forceZvel, 0);
+}
 
 //////////////////// HUD WEAPON / MISC. DISPLAY CODE ////////////////////
 

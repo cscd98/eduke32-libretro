@@ -26,6 +26,9 @@ int16_t              centerSector;
 bool                 centerValid = false;
 retro_vr_frame_state frame       = {};
 LibretroVr::Crop     crops[2];
+bool                 aimValid = false;
+float                aimYaw = 0, aimPitch = 0, hudX = 0, hudY = 0;
+int32_t              savedOffsetX = 0, savedOffsetY = 0;
 
 void clearMap()
 {
@@ -73,12 +76,12 @@ bool allocate()
 #ifdef EDUKE32_GLES
     const char *vs = "#version 100\nattribute vec2 p; varying vec2 uv; void main(){uv=p*.5+.5;gl_Position=vec4(p,0.,1.);}";
     const char *fs = "#version 100\nprecision mediump float; varying vec2 uv; uniform sampler2D world,hud; uniform vec4 "
-                     "crop; void main(){vec4 "
-                     "h=texture2D(hud,uv);gl_FragColor=vec4(texture2D(world,crop.xy+uv*crop.zw).rgb*(1.-h.a)+h.rgb,1.);}";
+                     "crop; void main(){"
+                     "vec2 c=crop.xy+uv*crop.zw;vec4 h=texture2D(hud,c);gl_FragColor=vec4(texture2D(world,c).rgb*(1.-h.a)+h.rgb,1.);}";
 #else
     const char *vs = "#version 120\nattribute vec2 p; varying vec2 uv; void main(){uv=p*.5+.5;gl_Position=vec4(p,0.,1.);}";
-    const char *fs = "#version 120\nvarying vec2 uv; uniform sampler2D world,hud; uniform vec4 crop; void main(){vec4 "
-                     "h=texture2D(hud,uv);gl_FragColor=vec4(texture2D(world,crop.xy+uv*crop.zw).rgb*(1.-h.a)+h.rgb,1.);}";
+    const char *fs = "#version 120\nvarying vec2 uv; uniform sampler2D world,hud; uniform vec4 crop; void main(){"
+                     "vec2 c=crop.xy+uv*crop.zw;vec4 h=texture2D(hud,c);gl_FragColor=vec4(texture2D(world,c).rgb*(1.-h.a)+h.rgb,1.);}";
 #endif
     GLuint v = shader(GL_VERTEX_SHADER, vs), f = shader(GL_FRAGMENT_SHADER, fs);
 
@@ -168,8 +171,8 @@ void beginTarget(int index)
 
 void libretro_vr_reset_tracking()
 {
-    referenceValid = stereo = tracked = false;
-    eyeIndex                          = -1;
+    referenceValid = stereo = tracked = aimValid = false;
+    eyeIndex                                     = -1;
 }
 
 void libretro_vr_flat()
@@ -206,8 +209,8 @@ void libretro_vr_destroy()
 void libretro_vr_frame(bool hardware, unsigned framebuffer)
 {
     output = framebuffer;
-    stereo = tracked = false;
-    eyeIndex         = -1;
+    stereo = tracked = aimValid = false;
+    eyeIndex                    = -1;
 
     unsigned status = 0;
     if (libretro_vr_mode == LibretroVrMode::Off || !hardware || !environ_cb(RETRO_ENVIRONMENT_GET_VIDEO_VIEWS_STATUS, &status)
@@ -227,6 +230,39 @@ void libretro_vr_frame(bool hardware, unsigned framebuffer)
             for (int i = 0; i < 3; i++)
                 reference[i] = (frame.eyes[0].position[i] + frame.eyes[1].position[i]) * .5f;
         referenceValid = true;
+
+        retro_vr_controller_poses poses = {};
+        if (environ_cb(RETRO_ENVIRONMENT_GET_VR_CONTROLLER_POSES, &poses))
+        {
+            const int order[2] = { RETRO_VR_HAND_RIGHT, RETRO_VR_HAND_LEFT };
+            for (int hand : order)
+            {
+                auto &h = poses.hands[hand];
+                if (!(h.flags & RETRO_VR_HAND_ACTIVE) || !(h.aim.flags & RETRO_VR_POSE_ORIENTATION_VALID))
+                    continue;
+
+                auto dir = LibretroVr::forward(h.aim.orientation);
+                if (!std::isfinite(dir.x + dir.y + dir.z))
+                    continue;
+
+                aimYaw   = std::atan2(dir.x, -dir.z);
+                aimPitch = std::asin(std::max(-1.f, std::min(1.f, dir.y)));
+
+                // Direction of the aim ray relative to where the head looks, as a tangent on the HUD plane.
+                auto  head = LibretroVr::unrotate(frame.eyes[0].orientation, dir);
+                float depth = std::max(-head.z, .2f);
+                float limit = 2.f;
+                float tx = std::max(-limit, std::min(limit, head.x / depth));
+                float ty = std::max(-limit, std::min(limit, head.y / depth));
+
+                // 100 HUD units span a vertical half-extent of tangent/aspect.
+                float scale = 100.f * (float(xdim) / ydim) / std::max(LibretroVr::crop(frame.eyes[0], float(xdim) / ydim).tangent, .05f);
+                hudX        = tx * scale;
+                hudY        = -ty * scale;
+                aimValid    = true;
+                break;
+            }
+        }
     }
     else
         referenceValid = false;
@@ -358,7 +394,7 @@ void libretro_vr_camera(int32_t *x, int32_t *y, int32_t *z, int32_t *angle, int1
         auto a    = LibretroVr::angles(eye.orientation);
         *angle += fix16_from_float(a.yaw * (1024.f / LibretroVr::pi));
         pitch = a.pitch;
-        renderSetRollAngle(int(-a.roll * (1024.f / LibretroVr::pi)));
+        renderSetRollAngle(int(a.roll * (1024.f / LibretroVr::pi)));
         renderSetAspect(int(crops[eyeIndex].tangent * 65536.f), 81920);
     }
 
@@ -388,6 +424,35 @@ bool libretro_vr_angles(float *sine, float *cosine)
     return true;
 }
 
+bool libretro_vr_aim(int32_t *angleOffset, int32_t *horiz)
+{
+    if (!aimValid)
+        return false;
+
+    *angleOffset = int(aimYaw * (1024.f / LibretroVr::pi));
+    *horiz       = 100 + int(std::tan(aimPitch) * 128.f);
+
+    return true;
+}
+
+void libretro_vr_hud_begin()
+{
+    savedOffsetX = rotatesprite_x_offset;
+    savedOffsetY = rotatesprite_y_offset;
+
+    if (overlay && aimValid)
+    {
+        rotatesprite_x_offset += int(hudX * 65536.f);
+        rotatesprite_y_offset += int(hudY * 65536.f);
+    }
+}
+
+void libretro_vr_hud_end()
+{
+    rotatesprite_x_offset = savedOffsetX;
+    rotatesprite_y_offset = savedOffsetY;
+}
+
 void libretro_vr_blend(unsigned source, unsigned dest)
 {
     if (overlay)
@@ -405,6 +470,9 @@ void libretro_vr_frame(bool, unsigned) {}
 bool libretro_vr_draw(int, int) { return false; }
 void libretro_vr_camera(int32_t *, int32_t *, int32_t *, int32_t *, int16_t *) {}
 bool libretro_vr_angles(float *, float *) { return false; }
+bool libretro_vr_aim(int32_t *, int32_t *) { return false; }
+void libretro_vr_hud_begin() {}
+void libretro_vr_hud_end() {}
 void libretro_vr_blend(unsigned, unsigned) {}
 
 #endif

@@ -47,6 +47,31 @@ inline Angles angles(const float *q)
              std::atan2(2 * (x * y + w * z), 1 - 2 * (x * x + z * z)) };
 }
 
+struct Vec3
+{
+    float x, y, z;
+};
+
+// Forward (-Z) direction of an orientation quaternion (x, y, z, w) in tracking space.
+inline Vec3 forward(const float *q)
+{
+    const float n = std::sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
+    const float x = q[0] / n, y = q[1] / n, z = q[2] / n, w = q[3] / n;
+
+    return { -2 * (x * z + w * y), -2 * (y * z - w * x), -(1 - 2 * (x * x + y * y)) };
+}
+
+// Rotates v by the inverse of the orientation quaternion q.
+inline Vec3 unrotate(const float *q, Vec3 v)
+{
+    const float n = std::sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
+    const float x = -q[0] / n, y = -q[1] / n, z = -q[2] / n, w = q[3] / n;
+    const Vec3  c = { y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x };
+    const Vec3  d = { y * c.z - z * c.y, z * c.x - x * c.z, x * c.y - y * c.x };
+
+    return { v.x + 2 * (w * c.x + d.x), v.y + 2 * (w * c.y + d.y), v.z + 2 * (w * c.z + d.z) };
+}
+
 struct Crop
 {
     float x, y, w, h, tangent;

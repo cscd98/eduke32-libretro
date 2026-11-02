@@ -24,6 +24,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "android.h"
 #endif
 
+#ifdef LIBRETRO
+#include "vr.h"
+#endif
 #include "anim.h"
 #include "colmatch.h"
 #include "compat.h"
@@ -1054,7 +1057,13 @@ void G_DisplayRest(int32_t smoothratio)
                 G_DrawCameraText(pp->newowner);
             else
             {
+#ifdef LIBRETRO
+                libretro_vr_hud_begin();
+#endif
                 P_DisplayWeapon();
+#ifdef LIBRETRO
+                libretro_vr_hud_end();
+#endif
 #ifdef SPLITSCREEN_MOD_HACKS
                 if (pp2)  // HACK
                 {
@@ -1237,7 +1246,13 @@ void G_DisplayRest(int32_t smoothratio)
                 renderSetAspect(viewingrange, 65536);
             }
 
+#ifdef LIBRETRO
+            libretro_vr_hud_begin();
+#endif
             rotatesprite_win(crosshairpos.x, crosshairpos.y, crosshair_scale, 0, a, 0, crosshair_pal, crosshair_o);
+#ifdef LIBRETRO
+            libretro_vr_hud_end();
+#endif
 
             if (FURY)
                 renderSetAspect(viewingrange, oyxaspect);

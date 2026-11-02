@@ -763,6 +763,7 @@ EXTERN int32_t yxaspect, viewingrange;
 extern int32_t oxyaspect;
 EXTERN intptr_t *ylookup;
 
+EXTERN int32_t rotatesprite_x_offset;
 EXTERN int32_t rotatesprite_y_offset;
 EXTERN int32_t rotatesprite_yxaspect;
 

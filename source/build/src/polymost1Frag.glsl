@@ -34,6 +34,13 @@ uniform float u_usePalette;
 uniform vec4 u_npotEmulation;
 uniform float u_shadeInterpolate;
 
+uniform float u_skyMode;
+uniform vec4 u_skyView;
+uniform vec4 u_skyRot;
+uniform vec4 u_skyMap;
+uniform float u_skyTile;
+uniform float u_skyLimit;
+
 #ifdef POLYMOST1_EXTENDED
 uniform float u_useDetailMapping;
 uniform float u_useGlowMapping;
@@ -57,14 +64,48 @@ const vec4 c_vec4_luma_709 = vec4(0.2126, 0.7152, 0.0722, 0.0);
 
 void main()
 {
-    vec2 coord = mix(gl_TexCoord[0].xy,gl_TexCoord[0].yx,u_usePalette);
+    vec2 tcXY = gl_TexCoord[0].xy;
+    vec2 tcDx = dFdx(tcXY);
+    vec2 tcDy = dFdy(tcXY);
+    if (u_skyMode > 0.5)
+    {
+        // Head-tracked sky
+        vec3 o = vec3(gl_FragCoord.x - u_skyView.x, (u_skyView.w - gl_FragCoord.y) - u_skyView.y, u_skyView.z);
+        // Undo tilt first, then pitch (the GPU applies pitch, then tilt)
+        vec3 q = vec3(u_skyRot.w*o.x + u_skyRot.z*o.y, u_skyRot.w*o.y - u_skyRot.z*o.x, o.z);
+        vec3 h = vec3(q.x, q.y*u_skyRot.y + q.z*u_skyRot.x, q.z*u_skyRot.y - q.y*u_skyRot.x);
+        float turn = (atan(h.x, h.z)*0.15915494 + u_skyMap.x)*u_skyMap.w;
+        float tileIdx = floor(turn);
+        float tilt = h.y/max(length(h.xz), 0.0001);
+
+        // Derivatives must be taken before any discard
+        vec2 dx = vec2(dFdx(turn), dFdx(tilt));
+        vec2 dy = vec2(dFdy(turn), dFdy(tilt));
+        dx.x -= u_skyMap.w*floor(dx.x/u_skyMap.w + 0.5);
+        dy.x -= u_skyMap.w*floor(dy.x/u_skyMap.w + 0.5);
+        dx.y *= u_skyMap.z;
+        dy.y *= u_skyMap.z;
+        if (tileIdx - u_skyMap.w*floor(tileIdx/u_skyMap.w) != u_skyTile)
+            discard;
+        tcXY = vec2(turn - tileIdx, u_skyMap.y + u_skyMap.z*tilt);
+
+        // Past the top/bottom of the tile there is no image; avoid smearing the edge row
+        if (tcXY.y < 0.0 || tcXY.y > u_skyLimit)
+            discard;
+
+        // The vertex shader hands over swapped coordinates for indexed textures
+        tcXY = mix(tcXY, tcXY.yx, u_usePalette);
+        tcDx = mix(dx, dx.yx, u_usePalette);
+        tcDy = mix(dy, dy.yx, u_usePalette);
+    }
+    vec2 coord = mix(tcXY,tcXY.yx,u_usePalette);
     float modCoordYnpotEmulationFactor = mod(coord.y,u_npotEmulation.y);
     coord.xy = vec2(floor(modCoordYnpotEmulationFactor)*u_npotEmulation.x+coord.x, floor(coord.y*u_npotEmulation.w)+modCoordYnpotEmulationFactor);
-    vec2 newCoord = mix(gl_TexCoord[0].xy,mix(coord.xy,coord.yx,u_usePalette),u_npotEmulation.z);
+    vec2 newCoord = mix(tcXY,mix(coord.xy,coord.yx,u_usePalette),u_npotEmulation.z);
 #ifdef GL_ARB_shader_texture_lod
     vec2 texCoord = mix(fract(newCoord.xy), clamp(newCoord.xy, c_zero, c_one), u_clamp);
     texCoord = clamp(u_texturePosSize.zw*texCoord, u_halfTexelSize, u_texturePosSize.zw-u_halfTexelSize);
-    vec4 color = texture2DGradARB(s_texture, u_texturePosSize.xy+texCoord, dFdx(gl_TexCoord[0].xy), dFdy(gl_TexCoord[0].xy));
+    vec4 color = texture2DGradARB(s_texture, u_texturePosSize.xy+texCoord, tcDx, tcDy);
 #else
     vec2 transitionBlend = fwidth(floor(newCoord.xy));
     transitionBlend = fwidth(transitionBlend)+transitionBlend;

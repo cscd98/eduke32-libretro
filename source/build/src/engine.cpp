@@ -7777,6 +7777,7 @@ void dorotspr_handle_bit2(int32_t *sxptr, int32_t *syptr, int32_t *z, int32_t da
         int32_t zoomsc, sx=*sxptr, sy=*syptr;
         int32_t ouryxaspect = yxaspect, ourxyaspect = xyaspect;
 
+        sx += rotatesprite_x_offset;
         sy += rotatesprite_y_offset;
 
         if (!(dastat & RS_STRETCH) && 4*ydim <= 3*xdim)
@@ -9234,6 +9235,7 @@ int32_t engineInit(void)
 
     xyaspect = -1;
 
+    rotatesprite_x_offset = 0;
     rotatesprite_y_offset = 0;
     rotatesprite_yxaspect = 65536;
 

@@ -207,6 +207,7 @@ static float polymost1VisFactor = 128.f;
 static GLint polymost1FogEnabledLoc = -1;
 static float polymost1FogEnabled = 1.f;
 static GLint polymost1UseColorOnlyLoc = -1;
+static GLint polymost1SkyModeLoc = -1, polymost1SkyViewLoc = -1, polymost1SkyRotLoc = -1, polymost1SkyMapLoc = -1, polymost1SkyTileLoc = -1, polymost1SkyLimitLoc = -1;
 static float polymost1UseColorOnly = 0.f;
 static GLint polymost1UsePaletteLoc = -1;
 static float polymost1UsePalette = 1.f;
@@ -648,6 +649,12 @@ static void polymost_setCurrentShaderProgram(uint32_t programID)
     polymost1FogEnabledLoc = glGetUniformLocation(polymost1CurrentShaderProgramID, "u_fogEnabled");
     polymost1UsePaletteLoc = glGetUniformLocation(polymost1CurrentShaderProgramID, "u_usePalette");
     polymost1UseColorOnlyLoc = glGetUniformLocation(polymost1CurrentShaderProgramID, "u_useColorOnly");
+    polymost1SkyModeLoc = glGetUniformLocation(polymost1CurrentShaderProgramID, "u_skyMode");
+    polymost1SkyViewLoc = glGetUniformLocation(polymost1CurrentShaderProgramID, "u_skyView");
+    polymost1SkyRotLoc = glGetUniformLocation(polymost1CurrentShaderProgramID, "u_skyRot");
+    polymost1SkyMapLoc = glGetUniformLocation(polymost1CurrentShaderProgramID, "u_skyMap");
+    polymost1SkyTileLoc = glGetUniformLocation(polymost1CurrentShaderProgramID, "u_skyTile");
+    polymost1SkyLimitLoc = glGetUniformLocation(polymost1CurrentShaderProgramID, "u_skyLimit");
     polymost1UseDetailMappingLoc = glGetUniformLocation(polymost1CurrentShaderProgramID, "u_useDetailMapping");
     polymost1UseGlowMappingLoc = glGetUniformLocation(polymost1CurrentShaderProgramID, "u_useGlowMapping");
     polymost1NPOTEmulationLoc = glGetUniformLocation(polymost1CurrentShaderProgramID, "u_npotEmulation");
@@ -5241,6 +5248,22 @@ void fgetzsofslope(usectorptr_t sec, float dax, float day, float* ceilz, float *
         *florz += (sec->floorheinum*j)/i;
 }
 
+#ifdef LIBRETRO
+static void polymost_setVrSky(bool enable, float const *view = nullptr, float const *rot = nullptr, float const *map = nullptr)
+{
+    if (gl.currentShaderProgramID != polymost1CurrentShaderProgramID)
+        return;
+
+    if (enable)
+    {
+        glUniform4fv(polymost1SkyViewLoc, 1, view);
+        glUniform4fv(polymost1SkyRotLoc, 1, rot);
+        glUniform4fv(polymost1SkyMapLoc, 1, map);
+    }
+    glUniform1f(polymost1SkyModeLoc, enable ? 1.f : 0.f);
+}
+#endif
+
 static void polymost_flatskyrender(vec2f_t const* const dpxy, int32_t const n, int32_t method)
 {
     flatskyrender = 0;
@@ -5268,6 +5291,13 @@ static void polymost_flatskyrender(vec2f_t const* const dpxy, int32_t const n, i
     float vv[2];
     float t = (float)((1<<(picsiz[globalpicnum]&15))<<dapskybits);
     vv[1] = dd*((float)xdimscale*fviewingrange) * (1.f/(daptileyscale*65536.f));
+#ifdef LIBRETRO
+    float vrSin, vrCos;
+    bool const vrSky = (1<<(picsiz[globalpicnum]&15)) == tilesiz[globalpicnum].x &&
+                       (r_parallaxskypanning ? global_cf_xpanning == 0 : true) && libretro_vr_angles(&vrSin, &vrCos);
+#else
+    bool const vrSky = false;
+#endif
     vv[0] = dd*((float)((tilesiz[globalpicnum].y>>1)+dapyoffs)) - vv[1]*ghoriz;
     int ti = (1<<(picsiz[globalpicnum]>>4)); if (ti != tilesiz[globalpicnum].y) ti += ti;
     vec3f_t o;
@@ -5301,12 +5331,39 @@ static void polymost_flatskyrender(vec2f_t const* const dpxy, int32_t const n, i
     ti = globalpicnum;
     o.y = fviewingrange/(ghalfx*256.f); o.z = 1.f/o.y;
 
-    int y = ((int32_t)(((x0-ghalfx)*o.y)+fglobalang)>>(11-dapskybits));
+#ifdef LIBRETRO
+    if (vrSky)
+    {
+        int32_t const th = tilesiz[globalpicnum].y; // v is normalised by the real tile height
+        float const focal = ghalfx / gvrcorrection;
+        float const view[4] = { ghalfx, ghalfy, focal, float(ydim) };
+        float const rot[4] = { gshang, gchang, gstang, gctang };
+        float const map[4] = { fglobalang * (1.f/2048.f),
+                               float((tilesiz[globalpicnum].y>>1)+dapyoffs) / th,
+                               (t / (2.f * fPI)) * (65536.f / daptileyscale) / th, float(1<<dapskybits) };
+        glUniform1f(polymost1SkyLimitLoc, 1.f);
+        polymost_setVrSky(true, view, rot, map);
+    }
+#endif
+    int y = (int32_t)(((x0-ghalfx)*o.y)+fglobalang)>>(11-dapskybits);
     float fx = x0;
+    if (vrSky) y = 0;
 
     do
     {
         globalpicnum = dapskyoff[y&((1<<dapskybits)-1)]+ti;
+        if (vrSky)
+        {
+#ifdef LIBRETRO
+            if (gl.currentShaderProgramID == polymost1CurrentShaderProgramID)
+                glUniform1f(polymost1SkyTileLoc, float(y));
+#endif
+            y++;
+            o.x = x0; fx = x1;
+            if (y >= (1<<dapskybits)) ti = -1;
+        }
+        else
+        {
         if (npot)
         {
             float fx = ((float)((y<<(11-dapskybits))-fglobalang))*o.z+ghalfx;
@@ -5317,8 +5374,8 @@ static void polymost_flatskyrender(vec2f_t const* const dpxy, int32_t const n, i
             otex.u = otex.d*(t*((float)(fglobalang-(y<<(11-dapskybits)))) * (1.f/2048.f) + xpanning) - xtex.u*ghalfx;
         y++;
         o.x = fx; fx = ((float)((y<<(11-dapskybits))-fglobalang))*o.z+ghalfx;
-
         if (fx > x1) { fx = x1; ti = -1; }
+        }
 
         vec3d_t otexbak = otex, xtexbak = xtex, ytexbak = ytex;
 
@@ -5432,6 +5489,10 @@ static void polymost_flatskyrender(vec2f_t const* const dpxy, int32_t const n, i
     globalclipdist = ogclipdist;
 
     polymost_setClamp(0);
+#ifdef LIBRETRO
+    if (vrSky)
+        polymost_setVrSky(false);
+#endif
 
     flatskyrender = 1;
 }
