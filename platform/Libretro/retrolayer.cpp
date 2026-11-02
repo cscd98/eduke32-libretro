@@ -11,7 +11,13 @@
 #include "player.h"
 #include "screens.h"
 
+#include "softsurface.h"
+#include "palette.h"
+
 #include <setjmp.h>
+
+extern uint8_t *mirrorBuffer;
+extern char     inpreparemirror;
 
 // Various stubs
 #ifdef _WIN32
@@ -176,24 +182,84 @@ int32_t videoUpdatePalette(int32_t start, int32_t num)
 {
     UNREFERENCED_PARAMETER(start);
     UNREFERENCED_PARAMETER(num);
+#ifndef USE_OPENGL
+    if (bpp <= 8)
+        softsurface_setPalette(curpalettefaded, 0x00FF0000, 0x0000FF00, 0x000000FF);
+#endif
     return 0;
 }
 
 void videoBeginDrawing(void)
 {
-    lockcount++;
 #ifdef USE_OPENGL
+    lockcount++;
     if (glIsBuffer(drawpolyVertsID))
         glBindBuffer(GL_ARRAY_BUFFER, drawpolyVertsID);
+#else
+    if (bpp > 8)
+        return;
+
+    if (lockcount++ > 0)
+        return;
+
+    static intptr_t backupFrameplace = 0;
+
+    if (inpreparemirror)
+    {
+        if (offscreenrendering)
+        {
+            if (!backupFrameplace)
+                backupFrameplace = frameplace;
+            else if (frameplace != (intptr_t)mirrorBuffer && frameplace != backupFrameplace)
+                return;
+        }
+
+        frameplace = (intptr_t)mirrorBuffer;
+
+        if (offscreenrendering)
+            return;
+    }
+    else if (offscreenrendering)
+    {
+        if (backupFrameplace)
+        {
+            frameplace       = backupFrameplace;
+            backupFrameplace = 0;
+        }
+        return;
+    }
+    else
+        frameplace = (intptr_t)softsurface_getBuffer();
+
+    if (modechange)
+    {
+        bytesperline = xdim;
+        calc_ylookup(bytesperline, ydim);
+        modechange = 0;
+    }
 #endif
 }
 
 void videoEndDrawing(void)
 {
+#ifdef USE_OPENGL
     if (lockcount > 0)
         lockcount--;
-}
+#else
+    if (bpp > 8 || !frameplace)
+        return;
 
+    if (lockcount > 1)
+    {
+        lockcount--;
+        return;
+    }
+
+    if (!offscreenrendering)
+        frameplace = 0;
+    lockcount = 0;
+#endif
+}
 
 void videoSetPalette(int32_t, int32_t, int32_t)
 {
@@ -207,6 +273,15 @@ void videoShowFrame(int32_t w)
     extern GLuint drawpolyVertsID;
     if (glIsBuffer(drawpolyVertsID))
         glBindBuffer(GL_ARRAY_BUFFER, drawpolyVertsID);
+#else
+    if (offscreenrendering)
+        return;
+
+    while (lockcount)
+        videoEndDrawing();
+
+    if (libretro_sw_frame && softsurface_getBuffer())
+        softsurface_blitBuffer((uint32_t *)libretro_sw_frame, 32);
 #endif
 }
 
@@ -223,24 +298,48 @@ void videoGetModes(int display)
 
 int32_t videoSetMode(int32_t x, int32_t y, int32_t c, int32_t fs)
 {
+#ifdef USE_OPENGL
     UNREFERENCED_PARAMETER(x);
     UNREFERENCED_PARAMETER(y);
     UNREFERENCED_PARAMETER(c);
     UNREFERENCED_PARAMETER(fs);
+#else
+    UNREFERENCED_PARAMETER(c);
+
+    xres       = x;
+    yres       = y;
+    bpp        = 8;
+    fullscreen = fs;
+    modechange = 1;
+    lockcount  = 0;
+    frameplace = 0;
+
+    softsurface_initialize({ x, y }, { x, y });
+    videoUpdatePalette(0, 256);
+#endif
 
     return 0;
 }
+
+uint32_t libretro_sw_pitch = 0;
 
 void libretro_alloc_sw_frame(int w, int h)
 {
     free(libretro_sw_frame);
 
+#ifdef USE_OPENGL
     int bytes_per_pixel = (bpp > 8) ? 4 : 1;
+#else
+    int bytes_per_pixel = 4;
+#endif
 
-    libretro_sw_frame = (uint8_t *)malloc((size_t)w * h * bytes_per_pixel);
+    libretro_sw_frame = (uint8_t *)calloc((size_t)w * h, bytes_per_pixel);
+    libretro_sw_pitch = w * bytes_per_pixel;
 
+#ifdef USE_OPENGL
     frameplace   = (intptr_t)libretro_sw_frame;
     bytesperline = w * bytes_per_pixel;
+#endif
 }
 
 void videoResetMode(void)

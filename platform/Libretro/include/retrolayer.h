@@ -16,6 +16,7 @@ extern void retro_poll_input_once(void);
 // Analog stick values cached
 extern float    s_alx, s_aly, s_arx, s_ary;
 extern uint8_t *libretro_sw_frame;
+extern uint32_t libretro_sw_pitch;
 extern void     libretro_alloc_sw_frame(int w, int h);
 
 extern void G_PostLoadPalette(void);

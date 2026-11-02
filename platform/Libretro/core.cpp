@@ -1025,10 +1025,13 @@ RETRO_API void retro_run(void)
 
         bool done = G_DisplayLogo_Frame();
 
+        if (!use_hw)
+            videoNextPage();
+
         if (use_hw)
             video_cb(RETRO_HW_FRAME_BUFFER_VALID, (unsigned)xdim, (unsigned)ydim, 0);
         else
-            video_cb(libretro_sw_frame, xdim, ydim, bytesperline);
+            video_cb(libretro_sw_frame, xdim, ydim, libretro_sw_pitch);
 
         push_audio(clamped);
 
@@ -1069,7 +1072,9 @@ RETRO_API void retro_run(void)
 
     if (myplayer.gm & (MODE_EOL | MODE_RESTART))
     {
+#ifdef USE_OPENGL
         polymost_resetShaderIDs();
+#endif
         switch (G_EndOfLevel())
         {
             case 1:
@@ -1090,9 +1095,6 @@ RETRO_API void retro_run(void)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         polymost_forceShaderRebind();
     }
-
-    GLint prog = 0;
-    glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
 
     if ((myplayer.gm & (MODE_GAME | MODE_DEMO)) == 0)
     {
@@ -1116,7 +1118,7 @@ RETRO_API void retro_run(void)
     if (use_hw)
         video_cb(RETRO_HW_FRAME_BUFFER_VALID, (unsigned)xdim, (unsigned)ydim, 0);
     else
-        video_cb(libretro_sw_frame, xdim, ydim, bytesperline);
+        video_cb(libretro_sw_frame, xdim, ydim, libretro_sw_pitch);
 
     push_audio(clamped);
 }

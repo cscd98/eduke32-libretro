@@ -10,6 +10,9 @@
 #include "vr_math.h"
 
 LibretroVrMode libretro_vr_mode = LibretroVrMode::Off;
+
+#ifdef USE_OPENGL
+
 namespace
 {
 GLuint               textures[3] = {}, fbos[3] = {}, depth = 0, program = 0, buffer = 0, vao = 0;
@@ -392,3 +395,16 @@ void libretro_vr_blend(unsigned source, unsigned dest)
     else
         glBlendFunc(source, dest);
 }
+
+#else  // !USE_OPENGL
+
+void libretro_vr_reset_tracking() {}
+void libretro_vr_flat() {}
+void libretro_vr_destroy() {}
+void libretro_vr_frame(bool, unsigned) {}
+bool libretro_vr_draw(int, int) { return false; }
+void libretro_vr_camera(int32_t *, int32_t *, int32_t *, int32_t *, int16_t *) {}
+bool libretro_vr_angles(float *, float *) { return false; }
+void libretro_vr_blend(unsigned, unsigned) {}
+
+#endif
