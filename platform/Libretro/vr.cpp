@@ -11,12 +11,13 @@
 
 LibretroVrMode libretro_vr_mode = LibretroVrMode::Off;
 float          libretro_vr_hud_tan = .85f;
+bool           libretro_vr_hud_enabled = true;
 
 #ifdef USE_OPENGL
 
 namespace
 {
-GLuint               textures[3] = {}, fbos[3] = {}, depth = 0, program = 0, buffer = 0, vao = 0;
+GLuint               textures[4] = {}, fbos[4] = {}, depth = 0, program = 0, buffer = 0, vao = 0;
 int                  width = 0, height = 0, eyeIndex = -1;
 unsigned             output = 0;
 bool                 stereo = false, tracked = false, overlay = false, referenceValid = false;
@@ -27,10 +28,10 @@ int16_t              centerSector;
 bool                 centerValid = false;
 retro_vr_frame_state frame       = {};
 LibretroVr::Crop     crops[2];
-bool                 aimValid = false;
+bool                 aimValid = false, weaponTarget = false;
 // The HUD occupies libretro_vr_hud_tan (a tangent half-width) of the eye view instead of the whole headset FOV.
 float hudScaleFor(float tangent) { return std::max(1.f, tangent / std::max(libretro_vr_hud_tan, .1f)); }
-float                aimYaw = 0, aimPitch = 0, hudX = 0, hudY = 0;
+float                aimYaw = 0, aimPitch = 0, hudX = 0, hudY = 0, gunShiftX = 0, gunShiftY = 0;
 int32_t              savedOffsetX = 0, savedOffsetY = 0;
 
 void clearMap()
@@ -78,13 +79,13 @@ bool allocate()
     libretro_vr_destroy();
 #ifdef EDUKE32_GLES
     const char *vs = "#version 100\nattribute vec2 p; varying vec2 uv; void main(){uv=p*.5+.5;gl_Position=vec4(p,0.,1.);}";
-    const char *fs = "#version 100\nprecision mediump float; varying vec2 uv; uniform sampler2D world,hud; uniform vec4 "
-                     "crop; uniform float hudScale; void main(){"
-                     "vec2 c=crop.xy+uv*crop.zw;vec2 hc=.5+(c-.5)*hudScale;vec4 h=texture2D(hud,hc)*step(max(abs(hc.x-.5),abs(hc.y-.5)),.5);gl_FragColor=vec4(texture2D(world,c).rgb*(1.-h.a)+h.rgb,1.);}";
+    const char *fs = "#version 100\nprecision mediump float; varying vec2 uv; uniform sampler2D world,hud,gun; uniform vec4 "
+                     "crop; uniform float hudScale; uniform vec2 gunShift; void main(){"
+                     "vec2 c=crop.xy+uv*crop.zw;vec2 hc=.5+(c-.5)*hudScale;vec4 h=texture2D(hud,hc)*step(max(abs(hc.x-.5),abs(hc.y-.5)),.5);vec2 gc=.5+(c-.5-gunShift)*hudScale;vec4 g=texture2D(gun,gc)*step(max(abs(gc.x-.5),abs(gc.y-.5)),.5);vec3 col=texture2D(world,c).rgb*(1.-h.a)+h.rgb;gl_FragColor=vec4(col*(1.-g.a)+g.rgb,1.);}";
 #else
     const char *vs = "#version 120\nattribute vec2 p; varying vec2 uv; void main(){uv=p*.5+.5;gl_Position=vec4(p,0.,1.);}";
-    const char *fs = "#version 120\nvarying vec2 uv; uniform sampler2D world,hud; uniform vec4 crop; uniform float hudScale; void main(){"
-                     "vec2 c=crop.xy+uv*crop.zw;vec2 hc=.5+(c-.5)*hudScale;vec4 h=texture2D(hud,hc)*step(max(abs(hc.x-.5),abs(hc.y-.5)),.5);gl_FragColor=vec4(texture2D(world,c).rgb*(1.-h.a)+h.rgb,1.);}";
+    const char *fs = "#version 120\nvarying vec2 uv; uniform sampler2D world,hud,gun; uniform vec4 crop; uniform float hudScale; uniform vec2 gunShift; void main(){"
+                     "vec2 c=crop.xy+uv*crop.zw;vec2 hc=.5+(c-.5)*hudScale;vec4 h=texture2D(hud,hc)*step(max(abs(hc.x-.5),abs(hc.y-.5)),.5);vec2 gc=.5+(c-.5-gunShift)*hudScale;vec4 g=texture2D(gun,gc)*step(max(abs(gc.x-.5),abs(gc.y-.5)),.5);vec3 col=texture2D(world,c).rgb*(1.-h.a)+h.rgb;gl_FragColor=vec4(col*(1.-g.a)+g.rgb,1.);}";
 #endif
     GLuint v = shader(GL_VERTEX_SHADER, vs), f = shader(GL_FRAGMENT_SHADER, fs);
 
@@ -124,13 +125,13 @@ bool allocate()
     glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
-    glGenTextures(3, textures);
-    glGenFramebuffers(3, fbos);
+    glGenTextures(4, textures);
+    glGenFramebuffers(4, fbos);
     glGenRenderbuffers(1, &depth);
     glBindRenderbuffer(GL_RENDERBUFFER, depth);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, xdim, ydim);
 
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 4; i++)
     {
         glBindTexture(GL_TEXTURE_2D, textures[i]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, xdim, ydim, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
@@ -166,7 +167,7 @@ void beginTarget(int index)
     glStencilMask(0xff);
     glDepthMask(GL_TRUE);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-    glClearColor(0, 0, 0, index == 2 ? 0 : 1);
+    glClearColor(0, 0, 0, index >= 2 ? 0 : 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     polymost_forceShaderRebind();
 }
@@ -175,6 +176,7 @@ void beginTarget(int index)
 void libretro_vr_reset_tracking()
 {
     referenceValid = stereo = tracked = aimValid = false;
+    gunShiftX = gunShiftY = 0;
     eyeIndex                                     = -1;
 }
 
@@ -185,8 +187,8 @@ void libretro_vr_flat()
 
 void libretro_vr_destroy()
 {
-    glDeleteTextures(3, textures);
-    glDeleteFramebuffers(3, fbos);
+    glDeleteTextures(4, textures);
+    glDeleteFramebuffers(4, fbos);
 
     if (depth)
         glDeleteRenderbuffers(1, &depth);
@@ -200,7 +202,7 @@ void libretro_vr_destroy()
     if (vao)
         glDeleteVertexArrays(1, &vao);
 
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 4; i++)
         textures[i] = fbos[i] = 0;
 
     depth = program = buffer = vao = 0;
@@ -213,6 +215,7 @@ void libretro_vr_frame(bool hardware, unsigned framebuffer)
 {
     output = framebuffer;
     stereo = tracked = aimValid = false;
+    gunShiftX = gunShiftY = 0;
     eyeIndex                    = -1;
 
     unsigned status = 0;
@@ -261,6 +264,8 @@ void libretro_vr_frame(bool hardware, unsigned framebuffer)
                 // 100 HUD units span a vertical half-extent of tangent/aspect.
                 float eyeTangent = std::max(LibretroVr::crop(frame.eyes[0], float(xdim) / ydim).tangent, .05f);
                 float scale      = 100.f * (float(xdim) / ydim) / eyeTangent * hudScaleFor(eyeTangent);
+                gunShiftX   = tx / (2.f * eyeTangent);
+                gunShiftY   = ty * (float(xdim) / ydim) / (2.f * eyeTangent);
                 hudX        = tx * scale;
                 hudY        = -ty * scale;
                 aimValid    = true;
@@ -334,6 +339,7 @@ bool libretro_vr_draw(int player, int smoothratio)
     videoSetViewableArea(oldWindow1.x, oldWindow1.y, oldWindow2.x, oldWindow2.y);
     renderSetAspect(oldRange, oldAspect);
     renderSetRollAngle(0);
+    beginTarget(3);
     beginTarget(2);
     overlay = true;
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -353,6 +359,9 @@ bool libretro_vr_draw(int player, int smoothratio)
     glBindVertexArray(vao);
     glUniform1i(glGetUniformLocation(program, "world"), 0);
     glUniform1i(glGetUniformLocation(program, "hud"), 1);
+    glUniform1i(glGetUniformLocation(program, "gun"), 2);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, textures[3]);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, textures[2]);
 
@@ -362,12 +371,15 @@ bool libretro_vr_draw(int player, int smoothratio)
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textures[eye]);
         glUniform4f(glGetUniformLocation(program, "crop"), c.x, c.y, c.w, c.h);
+        glUniform2f(glGetUniformLocation(program, "gunShift"), gunShiftX, gunShiftY);
         glUniform1f(glGetUniformLocation(program, "hudScale"), tracked ? hudScaleFor(c.tangent) : 1.f);
         glViewport(eye * (xdim / 2), 0, xdim / 2, ydim);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }
 
     glBindVertexArray(oldVao);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, 0);
     glActiveTexture(GL_TEXTURE0);
     glViewport(0, 0, xdim, ydim);
     glClearColor(0, 0, 0, 1);
@@ -440,16 +452,24 @@ bool libretro_vr_aim(int32_t *angleOffset, int32_t *horiz)
     return true;
 }
 
+bool libretro_vr_hud_hidden()
+{
+    return overlay && !libretro_vr_hud_enabled;
+}
+
 void libretro_vr_hud_begin(bool weapon)
 {
     savedOffsetX = rotatesprite_x_offset;
     savedOffsetY = rotatesprite_y_offset;
+    weaponTarget = overlay && weapon && tracked && aimValid;
 
-    if (overlay && aimValid)
+    // The weapon goes to its own target, which the composite shifts to the aim point so it is not limited by the HUD panel.
+    if (weaponTarget)
+        glBindFramebuffer(GL_FRAMEBUFFER, fbos[3]);
+    else if (overlay && aimValid)
     {
         rotatesprite_x_offset += int(hudX * 65536.f);
-        // The weapon is anchored to the bottom of the HUD panel, so shifting it further down would clip it away.
-        rotatesprite_y_offset += int((weapon ? std::min(hudY, 0.f) : hudY) * 65536.f);
+        rotatesprite_y_offset += int(hudY * 65536.f);
     }
 }
 
@@ -457,6 +477,11 @@ void libretro_vr_hud_end()
 {
     rotatesprite_x_offset = savedOffsetX;
     rotatesprite_y_offset = savedOffsetY;
+
+    if (weaponTarget)
+        glBindFramebuffer(GL_FRAMEBUFFER, fbos[2]);
+
+    weaponTarget = false;
 }
 
 void libretro_vr_blend(unsigned source, unsigned dest)
@@ -477,6 +502,7 @@ bool libretro_vr_draw(int, int) { return false; }
 void libretro_vr_camera(int32_t *, int32_t *, int32_t *, int32_t *, int16_t *) {}
 bool libretro_vr_angles(float *, float *) { return false; }
 bool libretro_vr_aim(int32_t *, int32_t *) { return false; }
+bool libretro_vr_hud_hidden() { return false; }
 void libretro_vr_hud_begin(bool) {}
 void libretro_vr_hud_end() {}
 void libretro_vr_blend(unsigned, unsigned) {}

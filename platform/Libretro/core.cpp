@@ -94,7 +94,7 @@ static const ButtonMap button_map[] = {
     { RETRO_DEVICE_ID_JOYPAD_L2, gamefunc_Alt_Fire },
     { RETRO_DEVICE_ID_JOYPAD_R2, gamefunc_Fire },
     { RETRO_DEVICE_ID_JOYPAD_L3, gamefunc_Map },
-    { RETRO_DEVICE_ID_JOYPAD_R3, gamefunc_Toggle_Crosshair },
+    { RETRO_DEVICE_ID_JOYPAD_R3, gamefunc_Quick_Kick },
     { RETRO_DEVICE_ID_JOYPAD_SELECT, gamefunc_Inventory },
 };
 

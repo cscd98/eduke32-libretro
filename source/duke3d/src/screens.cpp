@@ -1157,10 +1157,17 @@ void G_DisplayRest(int32_t smoothratio)
         }
     }
 
+#ifdef LIBRETRO
+    if (!libretro_vr_hud_hidden())
+    {
+#endif
     if (pp->invdisptime > 0) G_DrawInventory(pp);
 
     if (VM_OnEvent(EVENT_DISPLAYSBAR, g_player[screenpeek].ps->i, screenpeek) == 0)
         G_DrawStatusBar(screenpeek);
+#ifdef LIBRETRO
+    }
+#endif
 
 #ifdef SPLITSCREEN_MOD_HACKS
     // HACK

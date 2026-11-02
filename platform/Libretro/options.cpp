@@ -68,6 +68,14 @@ static retro_core_option_v2_definition option_defs[] = {
       "display",
       { { "off", "Off" }, { "stereoscopic", "Stereoscopic" }, { "immersive", "Immersive" }, { NULL, NULL } },
       "off" },
+    { "eduke32_vr_hud",
+      "Display > VR HUD",
+      "VR HUD",
+      "Show the status bar, inventory and in-game messages in Immersive mode. The weapon and crosshair are always shown.",
+      NULL,
+      "display",
+      { { "on", "On" }, { "off", "Off" }, { NULL, NULL } },
+      "on" },
     { "eduke32_vr_hud_distance",
       "Display > VR HUD Distance",
       "VR HUD Distance",
@@ -186,6 +194,11 @@ void apply_core_options(void)
         else if (!strcmp(var.value, "immersive"))
             libretro_vr_mode = LibretroVrMode::Immersive;
     }
+
+    var.key                = "eduke32_vr_hud";
+    libretro_vr_hud_enabled = true;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+        libretro_vr_hud_enabled = strcmp(var.value, "off") != 0;
 
     var.key             = "eduke32_vr_hud_distance";
     libretro_vr_hud_tan = 0.85f;

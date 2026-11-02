@@ -142,6 +142,19 @@ void APIENTRY scale(GLfloat x, GLfloat y, GLfloat z)
     multMatrix(m.data());
 }
 
+void APIENTRY ortho(GLdouble l, GLdouble r, GLdouble b, GLdouble t, GLdouble n, GLdouble f)
+{
+    auto m = identity();
+    m[0]   = GLfloat(2 / (r - l));
+    m[5]   = GLfloat(2 / (t - b));
+    m[10]  = GLfloat(-2 / (f - n));
+    m[12]  = GLfloat(-(r + l) / (r - l));
+    m[13]  = GLfloat(-(t + b) / (t - b));
+    m[14]  = GLfloat(-(f + n) / (f - n));
+
+    multMatrix(m.data());
+}
+
 void APIENTRY floatState(GLenum key, GLfloat *v)
 {
     if (key == GL_MODELVIEW_MATRIX)
@@ -568,6 +581,7 @@ void libretro_gles_init()
     glPopMatrix                = popMatrix;
     glTranslatef               = translate;
     glScalef                   = scale;
+    glOrtho                    = ortho;
     glGetFloatv                = floatState;
     glColor4f                  = color4;
     glColor3f                  = color3;
