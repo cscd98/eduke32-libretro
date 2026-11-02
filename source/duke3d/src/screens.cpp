@@ -1058,7 +1058,7 @@ void G_DisplayRest(int32_t smoothratio)
             else
             {
 #ifdef LIBRETRO
-                libretro_vr_hud_begin();
+                libretro_vr_hud_begin(true);
 #endif
                 P_DisplayWeapon();
 #ifdef LIBRETRO
@@ -1247,7 +1247,7 @@ void G_DisplayRest(int32_t smoothratio)
             }
 
 #ifdef LIBRETRO
-            libretro_vr_hud_begin();
+            libretro_vr_hud_begin(false);
 #endif
             rotatesprite_win(crosshairpos.x, crosshairpos.y, crosshair_scale, 0, a, 0, crosshair_pal, crosshair_o);
 #ifdef LIBRETRO

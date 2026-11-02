@@ -2538,7 +2538,8 @@ static void Menu_PopulateLanguages()
         }
     }
 
-    localeSetCurrent(locales[newlanguage]);
+    if (newlanguage >= 0 && newlanguage < localeCount)
+        localeSetCurrent(locales[newlanguage]);
     MenuEntry_HideOnCondition(&ME_DISPLAYSETUP_LANGUAGE, localeCount <= 1);
 
     Xfree(locales);

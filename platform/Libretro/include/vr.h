@@ -9,6 +9,7 @@ enum class LibretroVrMode
 };
 
 extern LibretroVrMode libretro_vr_mode;
+extern float          libretro_vr_hud_tan;
 
 void libretro_vr_frame(bool hardware, unsigned framebuffer);
 bool libretro_vr_draw(int player, int smoothratio);
@@ -19,5 +20,5 @@ void libretro_vr_camera(int32_t *x, int32_t *y, int32_t *z, int32_t *angle, int1
 bool libretro_vr_angles(float *sine, float *cosine);
 void libretro_vr_blend(unsigned source, unsigned dest);
 bool libretro_vr_aim(int32_t *angleOffset, int32_t *horiz);
-void libretro_vr_hud_begin();
+void libretro_vr_hud_begin(bool weapon);
 void libretro_vr_hud_end();

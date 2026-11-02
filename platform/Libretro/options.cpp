@@ -68,6 +68,15 @@ static retro_core_option_v2_definition option_defs[] = {
       "display",
       { { "off", "Off" }, { "stereoscopic", "Stereoscopic" }, { "immersive", "Immersive" }, { NULL, NULL } },
       "off" },
+    { "eduke32_vr_hud_distance",
+      "Display > VR HUD Distance",
+      "VR HUD Distance",
+      "How far away the HUD and weapon appear in Immersive mode. "
+      "Closer makes them larger and may push the HUD out of view; farther makes them smaller.",
+      NULL,
+      "display",
+      { { "2.0", "Closest" }, { "1.1", "Close" }, { "0.85", "Default" }, { "0.65", "Far" }, { "0.5", "Farthest" }, { NULL, NULL } },
+      "0.85" },
     // ---- Controller ----
     { "eduke32_auto_aim",
       "Controller > Auto Aim",
@@ -177,6 +186,11 @@ void apply_core_options(void)
         else if (!strcmp(var.value, "immersive"))
             libretro_vr_mode = LibretroVrMode::Immersive;
     }
+
+    var.key             = "eduke32_vr_hud_distance";
+    libretro_vr_hud_tan = 0.85f;
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+        libretro_vr_hud_tan = (float)atof(var.value);
 
     // ---- Display: resolution ----
     var.key = "eduke32_resolution";
