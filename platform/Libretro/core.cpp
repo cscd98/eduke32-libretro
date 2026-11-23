@@ -23,6 +23,7 @@
 #include "gamedef.h"
 #include "global.h"
 #include "keyboard.h"
+#include "loguru.hpp"
 #include "mmulti.h"
 #include "osdcmds.h"
 #include "renderlayer.h"
@@ -397,6 +398,7 @@ static void context_reset(void)
     GLuint fbo = hw_render.get_current_framebuffer();
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
+#ifndef NDEBUG
     if (glDebugMessageCallback)
     {
         static unsigned debugMessages = 0;
@@ -411,6 +413,8 @@ static void context_reset(void)
         },
         nullptr);
     }
+
+#endif
 
     if (log_cb)
         log_cb(RETRO_LOG_INFO, "Graphics context ready\n");
@@ -433,6 +437,7 @@ static void context_destroy(void)
 // Game-state
 // --------------------------------------------------------------------------
 bool               game_initialised  = false;
+static bool        game_initialization_failed = false;
 static bool        level_needs_enter = true;
 static bool        level_loaded      = false;
 static std::string content_path;
@@ -480,6 +485,20 @@ RETRO_API void retro_set_environment(retro_environment_t cb)
 
     if (log_cb)
         log_cb(RETRO_LOG_INFO, "libretro-eduke32: %s\n", vfs_iface ? "using frontend VFS v5" : "VFS v5 unavailable, using native filesystem");
+}
+
+static void frontend_engine_log(void *, const loguru::Message &message)
+{
+    if (!log_cb)
+        return;
+
+    retro_log_level level = RETRO_LOG_INFO;
+    if (message.verbosity <= loguru::Verbosity_ERROR)
+        level = RETRO_LOG_ERROR;
+    else if (message.verbosity == loguru::Verbosity_WARNING)
+        level = RETRO_LOG_WARN;
+
+    log_cb(level, "%s%s\n", message.prefix, message.message);
 }
 
 RETRO_API void retro_init(void)
@@ -563,6 +582,7 @@ RETRO_API void retro_init(void)
 
     engineSetupAllocator();
     engineSetupLogging(fake_argc, const_cast<char **>(fake_argv));
+    loguru::add_callback("libretro", frontend_engine_log, nullptr, LOG_GAME_MAX);
     engineSetLogFile(APPBASENAME ".log", LOG_GAME_MAX);
 
     osdcallbacks_t callbacks = {};
@@ -598,6 +618,7 @@ RETRO_API void retro_init(void)
 
 RETRO_API void retro_deinit(void)
 {
+    loguru::remove_callback("libretro");
     if (game_initialised)
     {
         S_SoundShutdown();
@@ -650,7 +671,11 @@ RETRO_API void retro_reset(void)
 bool init_game()
 {
     if (enginePreInit())
-        log_cb(RETRO_LOG_INFO, "libretro-eduke32: engine failed to preinit\n");
+    {
+        if (log_cb)
+            log_cb(RETRO_LOG_ERROR, "libretro-eduke32: engine failed to preinit\n");
+        return false;
+    }
     {
         std::string dir     = content_path;
         auto        slash   = dir.find_last_of("/\\");
@@ -933,6 +958,7 @@ RETRO_API bool retro_load_game_special(unsigned, const retro_game_info *, size_t
 
 RETRO_API void retro_unload_game(void)
 {
+    game_initialization_failed = false;
     libretro_vr_reset_tracking();
     if (game_initialised)
     {
@@ -992,8 +1018,17 @@ RETRO_API void retro_run(void)
     }
 #endif
 
-    if (!game_initialised)
-        init_game();
+    if (game_initialization_failed)
+        return;
+
+    if (!game_initialised && !init_game())
+    {
+        game_initialization_failed = true;
+        if (log_cb)
+            log_cb(RETRO_LOG_ERROR, "libretro-eduke32: game initialization failed\n");
+        environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, nullptr);
+        return;
+    }
 
     libretro_vr_frame(use_hw, use_hw ? hw_render.get_current_framebuffer() : 0);
 
@@ -1029,7 +1064,10 @@ RETRO_API void retro_run(void)
             videoNextPage();
 
         if (use_hw)
+        {
+            glBindVertexArray(0);
             video_cb(RETRO_HW_FRAME_BUFFER_VALID, (unsigned)xdim, (unsigned)ydim, 0);
+        }
         else
             video_cb(libretro_sw_frame, xdim, ydim, libretro_sw_pitch);
 
@@ -1116,7 +1154,10 @@ RETRO_API void retro_run(void)
         main_loop_restart();
 
     if (use_hw)
+    {
+        glBindVertexArray(0);
         video_cb(RETRO_HW_FRAME_BUFFER_VALID, (unsigned)xdim, (unsigned)ydim, 0);
+    }
     else
         video_cb(libretro_sw_frame, xdim, ydim, libretro_sw_pitch);
 

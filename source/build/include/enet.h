@@ -144,6 +144,9 @@
     #include <sys/ioctl.h>
     #include <sys/time.h>
     #include <sys/socket.h>
+    #if defined(LIBRETRO) && defined(__SWITCH2__)
+    #include <sys/select.h>
+    #endif
     #include <poll.h>
     #include <arpa/inet.h>
     #include <netinet/in.h>

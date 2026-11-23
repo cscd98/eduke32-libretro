@@ -112,6 +112,7 @@ int32_t dedxt_handle_io(int32_t j /* TODO: better name */,
 
     inbuf = (ispacked && cleng < j) ? packbuf : midbuf;
 
+#if !defined(LIBRETRO) || !defined(__SWITCH2__)
     if (texcache.rw_mmap.is_mapped() && texcache.rw_mmap.mapped_length() >= texcache.dataFilePos + cleng)
     {
         if (ispacked && cleng < j)
@@ -127,6 +128,7 @@ int32_t dedxt_handle_io(int32_t j /* TODO: better name */,
         texcache.dataFilePos += cleng;
     }
     else
+#endif
     {
         buildvfs_fseek_abs(texcache.dataFilePtr, texcache.dataFilePos);
         texcache.dataFilePos += cleng;

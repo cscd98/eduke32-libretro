@@ -1,7 +1,9 @@
 #ifndef texcache_h_
 # define texcache_h_
 
+#if !defined(LIBRETRO) || !defined(__SWITCH2__)
 #include "mio.hpp"
+#endif
 #include "polymost.h"
 #include "mdsprite.h"
 
@@ -38,7 +40,9 @@ typedef struct texcacheitem_
 } texcacheindex;
 
 typedef struct {
+#if !defined(LIBRETRO) || !defined(__SWITCH2__)
     mio::mmap_sink rw_mmap;
+#endif
     buildvfs_FILE  indexFilePtr;
     buildvfs_FILE  dataFilePtr;
 

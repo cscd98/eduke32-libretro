@@ -869,7 +869,11 @@ int getexternaladdress(char *buffer, const char *host, int port)
 
     if ((h=gethostbyname(host)) == NULL)
     {
+#if defined(LIBRETRO) && defined(__SWITCH2__)
+        LOG_F(ERROR, "mmulti: gethostbyname() error in getexternaladdress()");
+#else
         LOG_F(ERROR, "mmulti: gethostbyname() error in getexternaladdress() (%d)", h_errno);
+#endif
         return(0);
     }
 

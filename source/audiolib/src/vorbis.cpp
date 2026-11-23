@@ -39,6 +39,10 @@
 #define VORBIS_IMPL
 #define OV_EXCLUDE_STATIC_CALLBACKS
 
+#if defined(LIBRETRO) && defined(__SWITCH2__)
+#include <alloca.h>
+#endif
+
 #include "minivorbis.h"
 
 typedef struct {

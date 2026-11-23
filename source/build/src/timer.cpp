@@ -279,6 +279,9 @@ int timerInit(int const tickspersecond)
 #ifdef HAVE_TIMER_RDTSC
         if (tsc_freq == 0)
         {
+#if defined(LIBRETRO) && defined(__SWITCH2__)
+            tsc_freq = armGetSystemTickFreq();
+#else
             auto const calibrationEndTime = timerGetFractionalTicks() + 100.0;
             auto const samplePeriodBegin  = timerSampleRDTSC();
             do { } while (timerGetFractionalTicks() < calibrationEndTime);
@@ -286,6 +289,7 @@ int timerInit(int const tickspersecond)
             auto const timePerSample   = timerSampleRDTSC() - samplePeriodEnd;
 
             tsc_freq = (samplePeriodEnd - samplePeriodBegin - timePerSample) * 10;
+#endif
         }
 #endif
         initDone = 1;

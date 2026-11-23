@@ -409,6 +409,9 @@ void APIENTRY link(GLuint program)
 
 void upload()
 {
+    // Current attributes are shared across VAOs and undefined after array draws.
+    glVertexAttrib4fv(2, color);
+
     GLint program;
     glGetIntegerv(GL_CURRENT_PROGRAM, &program);
     if (!program)

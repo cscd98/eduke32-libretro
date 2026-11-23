@@ -46,6 +46,12 @@
 #include <string.h>
 #include <glad/glad.h>
 
+#if defined(LIBRETRO) && defined(__SWITCH2__)
+int gladLoadGL(void) {
+    /* The frontend supplies symbols through gladLoadGLLoader. */
+    return 0;
+}
+#else
 static void* get_proc(const char *namez);
 
 #if defined(_WIN32) || defined(__CYGWIN__)
@@ -177,6 +183,8 @@ int gladLoadGL(void) {
 
     return status;
 }
+
+#endif
 
 struct gladGLversionStruct GLVersion = { 0, 0 };
 

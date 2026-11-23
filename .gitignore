@@ -91,3 +91,5 @@ project.xcworkspace/
 .DS_Store
 ._*
 /source/voidwrap/sdk/
+
+/platform/Libretro/*_libounce.nro

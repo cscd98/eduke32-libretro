@@ -24,7 +24,7 @@
 # ifdef RENDERTYPESDL
 #  include "sdlayer.h"
 # endif
-# if !defined _WIN32
+# if !defined(_WIN32) && !(defined(LIBRETRO) && defined(__SWITCH2__))
 #  include <dlfcn.h>
 # endif
 

@@ -120,6 +120,8 @@ char *Bgethomedir(void)
     return NULL;
 #elif defined EDUKE32_OSX
     return osx_gethomedir();
+#elif defined(LIBRETRO) && defined(__SWITCH2__)
+    return NULL;
 #elif defined(GEKKO)
     // return current drive's name
     char *drv, cwd[BMAX_PATH] = {0};

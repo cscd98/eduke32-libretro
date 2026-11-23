@@ -22,7 +22,9 @@
 #endif
 #include <sys/stat.h>
 
+#if !defined(LIBRETRO) || !defined(__SWITCH2__)
 #include "mio.hpp"
+#endif
 
 // mio uses OS file pointers on Windows and regular int file descriptors elsewhere
 #ifdef _WIN32
@@ -259,11 +261,14 @@ void texcache_freeptrs(void)
 
 static inline void texcache_clearmemcache(void)
 {
+#if !defined(LIBRETRO) || !defined(__SWITCH2__)
     texcache.rw_mmap.unmap();
+#endif
 }
 
 void texcache_syncmemcache(void)
 {
+#if !defined(LIBRETRO) || !defined(__SWITCH2__)
     if (!texcache.dataFilePtr || buildvfs_flength(texcache.dataFilePtr) <= 0)
         return;
 
@@ -279,6 +284,7 @@ void texcache_syncmemcache(void)
             texcache.rw_mmap.unmap();
         }
     }
+#endif
 }
 
 void texcache_init(void)
@@ -473,11 +479,14 @@ int texcache_readdata(void *outBuf, int32_t len)
 
     texcache.dataFilePos += len;
 
+#if !defined(LIBRETRO) || !defined(__SWITCH2__)
     if (texcache.rw_mmap.is_mapped() && texcache.rw_mmap.length() >= ofilepos + len)
     {
         Bmemcpy(outBuf, texcache.rw_mmap.data() + ofilepos, len);
         return 0;
     }
+
+#endif
 
     if (buildvfs_fseek_abs(texcache.dataFilePtr, ofilepos) || buildvfs_fread(outBuf, len,1,texcache.dataFilePtr) != 1)
         return 1;

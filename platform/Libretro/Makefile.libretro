@@ -66,6 +66,12 @@ ifeq ($(platform), unix)
   LDFLAGS  += -shared -Wl,--no-undefined
   LDLIBS   += -ldl
 
+else ifeq ($(platform), libounce)
+  TARGET_NAME := $(TARGET_NAME)_libounce
+  EXT := elf
+  DEFINES += -D_DEFAULT_SOURCE
+  USE_OPENGLES := 1
+
 else ifeq ($(platform), osx)
   EXT      := dylib
   CFLAGS   += -fPIC
@@ -222,6 +228,10 @@ endif
 
 include Makefile.common
 
+ifeq ($(platform), libounce)
+  LIBRETRO_SRCS += $(CORE_DIR)/switch2.cpp
+endif
+
 ###############################################################################
 # Object files
 ###############################################################################
@@ -248,6 +258,14 @@ OBJS := \
   $(MACT_OBJS) \
   $(COMMON_OBJS) \
   $(GLSL_OBJS)
+
+ifeq ($(platform), libounce)
+  TARGET := $(RARCH_CORE)
+  OBJECTS := $(OBJS)
+  CFLAGS += -I$(GLAD_INCLUDE)
+  CXXFLAGS += -I$(GLAD_INCLUDE)
+  include $(DEVKITPRO)/libounce/libounce-module.mk
+endif
 
 $(OBJS): Makefile.libretro Makefile.common
 
@@ -305,7 +323,7 @@ $(OBJDIR)/build/%.o: $(BUILD_SRC)/%.glsl
 all: $(RARCH_CORE)
 
 $(RARCH_CORE): $(OBJS)
-	$(CXX) $(LDFLAGS) -o $@ $^ -lm -pthread $(LDLIBS)
+	$(CXX) $(LDFLAGS) -o $@ $(filter $(OBJS),$^) -lm -pthread $(LDLIBS) $(LIBS)
 
 clean:
 	rm -rf $(OBJDIR) $(RARCH_CORE)

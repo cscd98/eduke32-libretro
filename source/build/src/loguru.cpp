@@ -1178,6 +1178,8 @@ namespace loguru
 				(void)thr_self(&thread_id);
 			#elif defined(__OpenBSD__)
 				pid_t thread_id = getthrid();
+			#elif defined(LIBRETRO) && defined(__SWITCH2__)
+				const auto thread_id = reinterpret_cast<uintptr_t>(pthread_self());
 			#elif LOGURU_PTHREADS
 				const auto native_id = pthread_self();
 				// Warning, even within POSIX, return types and sizes vary:
@@ -2117,6 +2119,24 @@ namespace loguru
 	}
 } // namespace loguru
 
+#elif defined(LIBRETRO) && defined(__SWITCH2__)
+namespace loguru
+{
+	void write_to_stderr(const char* data, size_t size)
+	{
+		fwrite(data, 1, size, stderr);
+	}
+
+	void call_default_signal_handler(int)
+	{
+		abort();
+	}
+
+	void install_signal_handlers(const SignalOptions&)
+	{
+		// Horizon does not provide POSIX signal delivery.
+	}
+}
 #else // _WIN32
 namespace loguru
 {

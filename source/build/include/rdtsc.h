@@ -34,6 +34,10 @@
 #ifndef rdtsc_h_
 #define rdtsc_h_
 
+#if defined(LIBRETRO) && defined(__SWITCH2__)
+#include <switch/arm/counter.h>
+#endif
+
 #if defined(__GCC__) || defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -43,7 +47,10 @@
 extern "C" {
 #endif
 
-#if defined _MSC_VER && !defined __clang__ && !defined(_M_ARM64)
+#if defined(LIBRETRO) && defined(__SWITCH2__)
+#define HAVE_TIMER_RDTSC
+FORCE_INLINE uint64_t eduke32_rdtsc(void) { return armGetSystemTick(); }
+#elif defined _MSC_VER && !defined __clang__ && !defined(_M_ARM64)
 #define HAVE_TIMER_RDTSC
 FORCE_INLINE uint64_t eduke32_rdtsc(void) { return __rdtsc( ); }
 #elif defined __i386__
