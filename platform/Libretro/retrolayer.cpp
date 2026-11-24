@@ -16,6 +16,10 @@
 
 #include <setjmp.h>
 
+#ifdef USE_OPENGL
+#include "glad/glad.h"
+#endif
+
 extern uint8_t *mirrorBuffer;
 extern char     inpreparemirror;
 
@@ -347,8 +351,6 @@ void videoResetMode(void)
 }
 
 #ifdef USE_OPENGL
-#include "glad/glad.h"
-
 extern retro_hw_get_proc_address_t get_proc_address_cb;
 
 static void *libretro_get_proc_address(const char *name)
