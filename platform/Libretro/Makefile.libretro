@@ -68,9 +68,27 @@ ifeq ($(platform), unix)
 
 else ifeq ($(platform), libounce)
   TARGET_NAME := $(TARGET_NAME)_libounce
-  EXT := elf
+  EXT := nro
   DEFINES += -D_DEFAULT_SOURCE
+
+  include $(DEVKITPRO)/libounce/switch2_rules
+
+  # Give EDuke32's GLAD priority over the DevkitPro GLAD.
+  CFLAGS := -I../../source/glad/include $(CFLAGS)
+  CXXFLAGS := -I../../source/glad/include $(CXXFLAGS)
+
+  CFLAGS += $(SWITCH2_SHARED_ARCH) $(CPPFLAGS)
+  CXXFLAGS += $(SWITCH2_SHARED_ARCH) $(CPPFLAGS)
   USE_OPENGLES := 1
+
+  LDFLAGS += -specs=$(SWITCH2_SHARED_SPECS) $(SWITCH2_SHARED_ARCH)
+  LDFLAGS += $(SWITCH2_SHARED_LIBPATHS) $(OVERLAY_LIBPATHS)
+  LDFLAGS += -shared
+  LDFLAGS += -Wl,-soname,$(TARGET_NAME).nro
+
+  LIBRETRO_VERSION_SCRIPT := -Wl,--version-script=$(abspath $(CORE_DIR)/link.T)
+
+  LDLIBS += -lnx
 
 else ifeq ($(platform), osx)
   EXT      := dylib
@@ -259,14 +277,6 @@ OBJS := \
   $(COMMON_OBJS) \
   $(GLSL_OBJS)
 
-ifeq ($(platform), libounce)
-  TARGET := $(RARCH_CORE)
-  OBJECTS := $(OBJS)
-  CFLAGS += -I$(GLAD_INCLUDE)
-  CXXFLAGS += -I$(GLAD_INCLUDE)
-  include $(DEVKITPRO)/libounce/libounce-module.mk
-endif
-
 $(OBJS): Makefile.libretro Makefile.common
 
 ###############################################################################
@@ -320,10 +330,26 @@ $(OBJDIR)/build/%.o: $(BUILD_SRC)/%.glsl
 
 .PHONY: all clean
 
+ifeq ($(platform), libounce)
+LIBRETRO_ELF := $(TARGET_NAME).elf
+
+all: $(RARCH_CORE)
+
+$(LIBRETRO_ELF): $(OBJS)
+	$(CXX) $(LDFLAGS) $(LIBRETRO_VERSION_SCRIPT) \
+		-o $@ $(filter $(OBJS),$^) -lm -pthread $(LDLIBS) $(LIBS)
+
+$(RARCH_CORE): $(LIBRETRO_ELF)
+	$(DEVKITPRO)/tools/bin/elf2nro $< $@
+
+else
+
 all: $(RARCH_CORE)
 
 $(RARCH_CORE): $(OBJS)
 	$(CXX) $(LDFLAGS) -o $@ $(filter $(OBJS),$^) -lm -pthread $(LDLIBS) $(LIBS)
+
+endif
 
 clean:
 	rm -rf $(OBJDIR) $(RARCH_CORE)
